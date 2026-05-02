@@ -1,5 +1,6 @@
 import type { Env } from "./types";
 import { handleAnalyze } from "./analyze";
+import { handleFeedback } from "./feedback";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -10,7 +11,7 @@ export default {
         return handleAnalyze(request, env);
       }
       if (url.pathname === "/api/feedback" && request.method === "POST") {
-        return new Response("not implemented", { status: 501 });
+        return handleFeedback(request, env);
       }
       if (url.pathname === "/api/survey" && request.method === "POST") {
         return new Response("not implemented", { status: 501 });
