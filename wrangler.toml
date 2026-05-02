@@ -1,0 +1,28 @@
+name = "depublius"
+main = "src/index.ts"
+compatibility_date = "2026-05-02"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "depublius"
+database_id = "e5b22010-c7df-4b2a-8b2b-b099c589b799"
+migrations_dir = "./migrations"
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 5, period = 3600 }  # 5 requests per IP per hour
+
+[vars]
+DAILY_BUDGET_CENTS = "500"
+TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # test key for dev; replace via vars.production for deploy
+
+[env.production.vars]
+DAILY_BUDGET_CENTS = "500"
+TURNSTILE_SITE_KEY = "<your-real-turnstile-site-key>"
