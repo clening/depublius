@@ -5,6 +5,16 @@
 // We reframe those into browser-friendly SSE:
 //   event: thinking|text|done|error
 //   data: {<small json>}
+//
+// The transformer also injects SSE comments (`: heartbeat\n\n`) every
+// HEARTBEAT_INTERVAL_MS of upstream silence. This keeps Cloudflare's edge
+// from terminating the connection during long no-byte gaps — most commonly
+// the period when Anthropic's web_search tool is fetching results and the
+// model is paused waiting for them. Comments are part of the SSE spec and
+// silently ignored by EventSource and our manual parser, so they cost
+// nothing on the client.
+
+const HEARTBEAT_INTERVAL_MS = 10_000;
 
 type AnthropicEvent =
   | { type: "content_block_delta"; delta: { type: "thinking_delta"; thinking: string } | { type: "text_delta"; text: string } }
@@ -22,6 +32,7 @@ export function transformAnthropicStream(
 ): ReadableStream<Uint8Array> {
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
+  const heartbeat = encoder.encode(": heartbeat\n\n");
   let buffer = "";
   let sentDone = false;
 
@@ -29,12 +40,27 @@ export function transformAnthropicStream(
     async start(controller) {
       const reader = upstream.getReader();
       try {
+        // Race each pending read() against a heartbeat timer. When the timer
+        // wins, push a keepalive comment and re-race the same pending read.
+        let pendingRead = reader.read();
         while (true) {
-          const { done, value } = await reader.read();
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          const tickPromise = new Promise<{ kind: "tick" }>((resolve) => {
+            timer = setTimeout(() => resolve({ kind: "tick" }), HEARTBEAT_INTERVAL_MS);
+          });
+          const dataPromise = pendingRead.then((r) => ({ kind: "data" as const, value: r }));
+          const winner = await Promise.race([dataPromise, tickPromise]);
+          if (timer) clearTimeout(timer);
+
+          if (winner.kind === "tick") {
+            controller.enqueue(heartbeat);
+            continue; // pendingRead is still in flight; loop and race again
+          }
+
+          const { done, value } = winner.value;
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          // SSE frames are separated by blank lines.
           let sepIdx: number;
           while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
             const raw = buffer.slice(0, sepIdx);
@@ -60,8 +86,9 @@ export function transformAnthropicStream(
               controller.enqueue(encoder.encode(sse("done", { submission_id: submissionId })));
               sentDone = true;
             }
-            // Other events (message_start, content_block_start/stop, ping, etc.) are intentionally ignored.
           }
+
+          pendingRead = reader.read();
         }
         if (!sentDone) {
           controller.enqueue(encoder.encode(sse("done", { submission_id: submissionId })));
