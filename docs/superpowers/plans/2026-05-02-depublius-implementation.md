@@ -558,18 +558,37 @@ export default defineConfig({
 Also create `test/apply-migrations.ts`:
 
 ```typescript
-import { applyD1Migrations, env, type D1Migration } from "cloudflare:test";
+import { applyD1Migrations, env } from "cloudflare:test";
 import { beforeAll } from "vitest";
-
-declare module "cloudflare:test" {
-  interface ProvidedEnv {
-    TEST_MIGRATIONS: D1Migration[];
-  }
-}
 
 beforeAll(async () => {
   await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 });
+```
+
+And `test/env.d.ts` (ambient typing so `cloudflare:test`'s `env: Cloudflare.Env` knows about our bindings — without this, `tsc` reports `Property 'DB' does not exist on type 'Env'` in test files):
+
+```typescript
+/// <reference types="@cloudflare/vitest-pool-workers/types" />
+
+import type { D1Migration } from "cloudflare:test";
+
+declare global {
+  namespace Cloudflare {
+    interface Env {
+      ASSETS: Fetcher;
+      DB: D1Database;
+      RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> };
+      ANTHROPIC_API_KEY: string;
+      TURNSTILE_SECRET: string;
+      TURNSTILE_SITE_KEY: string;
+      DAILY_BUDGET_CENTS: string;
+      TEST_MIGRATIONS: D1Migration[];
+    }
+  }
+}
+
+export {};
 ```
 
 - [ ] **Step 2: Add a smoke test to verify Vitest works**
