@@ -4,48 +4,11 @@ const escapeHtml = (s) => s
   .replace(/</g, "&lt;")
   .replace(/>/g, "&gt;");
 
-// Inject Turnstile api.js, then render the widget once the library is ready.
-// `window.turnstile` becomes an object before all its methods (like .render)
-// are defined, so we wait until .render is actually a function — using
-// turnstile.ready() if exposed, or polling as a fallback.
-async function bootTurnstile() {
-  let pollCount = 0;
-  function actuallyRender(sitekey) {
-    const div = document.getElementById("turnstile");
-    if (!div || div.dataset.rendered) return;
-    if (window.turnstile && typeof window.turnstile.render === "function") {
-      window.turnstile.render(div, { sitekey, theme: "light" });
-      div.dataset.rendered = "1";
-      return;
-    }
-    if (pollCount++ < 50) setTimeout(() => actuallyRender(sitekey), 100);
-  }
-
-  try {
-    const cfg = await fetch("/api/config").then((r) => r.json());
-    if (!cfg.turnstile_site_key) return;
-
-    if (window.turnstile && typeof window.turnstile.ready === "function") {
-      window.turnstile.ready(() => actuallyRender(cfg.turnstile_site_key));
-    } else if (window.turnstile && typeof window.turnstile.render === "function") {
-      actuallyRender(cfg.turnstile_site_key);
-    } else if (!document.querySelector('script[src*="turnstile/v0/api.js"]')) {
-      const script = document.createElement("script");
-      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
-      script.async = true;
-      script.defer = true;
-      script.onload = () => actuallyRender(cfg.turnstile_site_key);
-      document.head.appendChild(script);
-    } else {
-      // Script tag already in DOM but library still initializing — poll.
-      actuallyRender(cfg.turnstile_site_key);
-    }
-  } catch {
-    // /api/config unreachable — widget stays unrendered, user gets
-    // "please complete the human-verification check" on submit.
-  }
-}
-bootTurnstile();
+// Turnstile is intentionally disabled in v1 — the widget refused to render
+// reliably across browsers/environments and was blocking all legitimate
+// users. The /api/analyze handler also skips its server-side verification.
+// Per-IP rate limit + daily budget cap + Cloudflare's free bot mitigation
+// remain as defense-in-depth.
 
 const passageEl = $("#passage");
 const wordCountEl = $("#word-count");
@@ -87,16 +50,6 @@ formEl.addEventListener("submit", async (e) => {
     errorEl.textContent = `Passage must be 150–500 words (got ${n}).`;
     return;
   }
-  // Use the real Turnstile token when the widget has rendered, otherwise
-  // fall back to a non-empty placeholder. In local dev the server-side
-  // TURNSTILE_SECRET is Cloudflare's "always-pass" test secret, so any
-  // non-empty token verifies. In production with a real secret, the
-  // placeholder will be rejected — which is the correct behavior, since
-  // a real widget should always be present there.
-  const turnstileToken = (window.turnstile && window.turnstile.getResponse
-    ? window.turnstile.getResponse()
-    : "") || "no-widget";
-
   submitBtn.disabled = true;
   submitBtn.textContent = "Thinking…";
   thinkingEl.textContent = "";
@@ -111,7 +64,7 @@ formEl.addEventListener("submit", async (e) => {
       body: JSON.stringify({
         passage,
         use_search: currentSearchUsed,
-        turnstile_token: turnstileToken,
+        turnstile_token: "",
       }),
     });
     if (!res.ok) {
@@ -127,7 +80,6 @@ formEl.addEventListener("submit", async (e) => {
   } finally {
     submitBtn.disabled = false;
     submitBtn.textContent = "Identify me";
-    if (window.turnstile && window.turnstile.reset) window.turnstile.reset();
   }
 });
 

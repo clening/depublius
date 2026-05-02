@@ -35,9 +35,15 @@ export async function handleAnalyze(request: Request, env: Env): Promise<Respons
   const validation = validatePassage(body.passage ?? "");
   if (!validation.ok) return jsonError(400, validation.error);
 
-  const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
-  const turnstileOk = await verifyTurnstile(body.turnstile_token, env.TURNSTILE_SECRET, ip);
-  if (!turnstileOk) return jsonError(403, "Could not verify you're human. Please refresh and try again.");
+  // Turnstile verification disabled — the widget refused to render reliably
+  // across browsers/environments and was blocking all legitimate users.
+  // Defense-in-depth still in place: per-IP rate limit, daily budget cap,
+  // input validation, prompt-injection wrapping, and Cloudflare's free
+  // bot/DDoS mitigation. The verifyTurnstile helper, secret, and site key
+  // are intentionally preserved so re-enabling is a one-block change.
+  // const ip = request.headers.get("cf-connecting-ip") ?? "unknown";
+  // const turnstileOk = await verifyTurnstile(body.turnstile_token, env.TURNSTILE_SECRET, ip);
+  // if (!turnstileOk) return jsonError(403, "Could not verify you're human. Please refresh and try again.");
 
   const rate = await checkRateLimit(env, request);
   if (!rate.allowed) return jsonError(429, "Slow down — try again in an hour.");
