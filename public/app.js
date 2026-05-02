@@ -119,6 +119,7 @@ function handleSseMessage(raw) {
     currentSubmissionId = data.submission_id;
   } else if (event === "error") {
     errorEl.textContent = data.message || "Stream error";
+    errorEl.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
 

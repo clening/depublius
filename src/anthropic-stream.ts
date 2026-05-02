@@ -91,7 +91,18 @@ export function transformAnthropicStream(
           pendingRead = reader.read();
         }
         if (!sentDone) {
-          controller.enqueue(encoder.encode(sse("done", { submission_id: submissionId })));
+          // Upstream closed without sending message_stop. This usually means
+          // the connection to Anthropic was terminated mid-stream — most often
+          // during a long web_search call that exceeded a platform idle
+          // timeout. Surface this as an honest error so the client can prompt
+          // the user to retry (typically without search).
+          controller.enqueue(
+            encoder.encode(sse("error", {
+              message: "The model's response was cut off before completing. " +
+                "If you had web search enabled, try again without it — search " +
+                "queries can sometimes take longer than the platform allows.",
+            }))
+          );
         }
         controller.close();
       } catch {
