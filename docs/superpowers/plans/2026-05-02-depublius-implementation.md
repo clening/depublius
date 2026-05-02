@@ -526,18 +526,49 @@ git commit -m "feat: Worker entry with API router stubs + static asset placehold
 
 - [ ] **Step 1: Create `vitest.config.ts`**
 
-`@cloudflare/vitest-pool-workers` v4+ uses `cloudflareTest` as a Vitest plugin (not `defineWorkersConfig` from `/config` — that subpath was removed in 0.10.x). Use this shape:
+`@cloudflare/vitest-pool-workers` v4+ uses `cloudflareTest` as a Vitest plugin (not `defineWorkersConfig` from `/config` — that subpath was removed in 0.10.x). The config also wires up D1 migration application: `readD1Migrations` reads the `migrations/` directory and exposes them via a `TEST_MIGRATIONS` Miniflare binding, and `setupFiles` registers `test/apply-migrations.ts` to apply them before each test file runs. Without this, any test that touches `env.DB` will fail with `no such table` errors.
 
 ```typescript
-import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  cloudflareTest,
+  readD1Migrations,
+} from "@cloudflare/vitest-pool-workers";
 import { defineConfig } from "vitest/config";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const migrations = await readD1Migrations(path.join(__dirname, "migrations"));
 
 export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.toml" },
+      miniflare: {
+        bindings: { TEST_MIGRATIONS: migrations },
+      },
     }),
   ],
+  test: {
+    setupFiles: ["./test/apply-migrations.ts"],
+  },
+});
+```
+
+Also create `test/apply-migrations.ts`:
+
+```typescript
+import { applyD1Migrations, env, type D1Migration } from "cloudflare:test";
+import { beforeAll } from "vitest";
+
+declare module "cloudflare:test" {
+  interface ProvidedEnv {
+    TEST_MIGRATIONS: D1Migration[];
+  }
+}
+
+beforeAll(async () => {
+  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
 });
 ```
 
