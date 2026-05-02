@@ -48,6 +48,13 @@ npm run deploy
 
 - The Workers `rate-limiting` binding is in beta; `wrangler.toml` uses
   `[[unsafe.bindings]]` syntax. Watch for breaking changes.
+- The local Miniflare emulator only accepts `period: 10` or `60` for the
+  rate-limit binding, while the deployed Workers runtime accepts 3600.
+  `wrangler.toml` keeps `period = 60` at the top level for local dev and
+  overrides it via `[[env.production.unsafe.bindings]]` to `period = 3600`.
+  This is why the npm `deploy` script uses `wrangler deploy --env production` —
+  without `--env production`, the deployed Worker would inherit the 60s
+  local-dev value.
 - Anthropic web search tool (`web_search_20250305`) bills per search; keep
   it gated behind the user's checkbox.
 - Writing samples MUST NOT be logged or stored. Only the model's output

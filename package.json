@@ -7,7 +7,7 @@
   "author": "Carey Lening <carey.lening@gmail.com>",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --env production",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate:local": "wrangler d1 migrations apply depublius --local",
