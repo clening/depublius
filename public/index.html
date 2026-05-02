@@ -1,2 +1,91 @@
 <!doctype html>
-<html><body><h1>(De)Publius — placeholder</h1></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>(De)Publius — Can Claude identify you from your writing?</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>(De)Publius</h1>
+      <p class="lede">Paste 150–500 words of your own writing. Claude will read it and try to tell you who wrote it.</p>
+      <p class="warning">⚠ Use only <strong>unpublished draft writing</strong>. Anything you've already published is fair game for retrieval-augmented identification — that's not what this experiment measures.</p>
+    </header>
+
+    <form id="analyze-form">
+      <label for="passage" class="visually-hidden">Your writing</label>
+      <textarea id="passage" name="passage" rows="14" placeholder="Paste your draft here…" required></textarea>
+      <p id="word-count" aria-live="polite">0 words</p>
+
+      <label class="checkbox">
+        <input type="checkbox" id="use-search" name="use_search">
+        Allow Claude to search the web
+      </label>
+
+      <div class="cf-turnstile" data-sitekey="" data-theme="light" id="turnstile"></div>
+
+      <button type="submit" id="submit-btn">Identify me</button>
+      <p id="form-error" role="alert"></p>
+    </form>
+
+    <section id="results" hidden>
+      <details id="reasoning-panel" open>
+        <summary>Reasoning</summary>
+        <pre id="thinking"></pre>
+      </details>
+      <article id="answer"></article>
+
+      <div id="thumbs">
+        <span>Was Claude right?</span>
+        <button type="button" data-vote="up" id="thumb-up">👍</button>
+        <button type="button" data-vote="down" id="thumb-down">👎</button>
+      </div>
+
+      <details id="survey-section" open>
+        <summary>Optional survey (for science)</summary>
+        <form id="survey-form">
+          <label class="checkbox">
+            <input type="checkbox" name="has_public_writing">
+            I have a Substack/blog or regularly write on a public forum (LinkedIn, HackerNews, Reddit, LessWrong, etc.)
+          </label>
+
+          <label>
+            On average, how many posts do you write per month?
+            <input type="number" name="posts_per_month" min="0" max="9999">
+          </label>
+
+          <fieldset>
+            <legend>Did you run the analysis with or without search?</legend>
+            <label class="checkbox"><input type="checkbox" name="ran_without"> Without search</label>
+            <label class="checkbox"><input type="checkbox" name="ran_with"> With search</label>
+          </fieldset>
+
+          <label class="checkbox" id="search-needed-wrapper" hidden>
+            <input type="checkbox" name="search_was_needed">
+            If you ran both: was Claude unable to identify you without search?
+          </label>
+
+          <label>
+            Anything else you'd like to share?
+            <textarea name="freeform_comment" rows="3" maxlength="2000"></textarea>
+          </label>
+
+          <button type="submit" id="survey-submit">Submit survey</button>
+          <button type="button" id="survey-skip">Skip</button>
+          <p id="survey-status" aria-live="polite"></p>
+        </form>
+      </details>
+    </section>
+
+    <footer>
+      <p>Your writing prompt is not saved. However, if you answer the optional survey (for science!), this information will be saved anonymously in a csv file so I can compile some statistics on how close we are to deanonymization at scale. Aggregate data on thumbs up / down interactions and whether search was enabled will also be collected.</p>
+      <p><a href="https://github.com/clening/depublius">Source on GitHub</a> · Built by <a href="https://www.theargumentmag.com/">Carey Lening</a></p>
+    </footer>
+  </main>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>
