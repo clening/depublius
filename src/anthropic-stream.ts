@@ -15,6 +15,7 @@
 // nothing on the client.
 
 const HEARTBEAT_INTERVAL_MS = 10_000;
+const MAX_REQUEST_MS = 90_000;
 
 type AnthropicEvent =
   | { type: "content_block_delta"; delta: { type: "thinking_delta"; thinking: string } | { type: "text_delta"; text: string } }
@@ -39,11 +40,28 @@ export function transformAnthropicStream(
   return new ReadableStream<Uint8Array>({
     async start(controller) {
       const reader = upstream.getReader();
+      const startTime = Date.now();
       try {
         // Race each pending read() against a heartbeat timer. When the timer
         // wins, push a keepalive comment and re-race the same pending read.
+        // If total wall-clock exceeds MAX_REQUEST_MS, abort with a real error
+        // — covers the case where the upstream fetch goes truly silent
+        // (no bytes, no close, no throw) and reader.read() would hang forever.
         let pendingRead = reader.read();
         while (true) {
+          if (Date.now() - startTime > MAX_REQUEST_MS) {
+            console.error(`Analyze stream exceeded ${MAX_REQUEST_MS}ms, aborting`);
+            controller.enqueue(
+              encoder.encode(sse("error", {
+                message: "Analysis took longer than 90 seconds and was aborted. " +
+                  "If you had web search enabled, please try again without it.",
+              }))
+            );
+            reader.cancel().catch(() => {});
+            controller.close();
+            return;
+          }
+
           let timer: ReturnType<typeof setTimeout> | null = null;
           const tickPromise = new Promise<{ kind: "tick" }>((resolve) => {
             timer = setTimeout(() => resolve({ kind: "tick" }), HEARTBEAT_INTERVAL_MS);
@@ -91,11 +109,7 @@ export function transformAnthropicStream(
           pendingRead = reader.read();
         }
         if (!sentDone) {
-          // Upstream closed without sending message_stop. This usually means
-          // the connection to Anthropic was terminated mid-stream — most often
-          // during a long web_search call that exceeded a platform idle
-          // timeout. Surface this as an honest error so the client can prompt
-          // the user to retry (typically without search).
+          console.error("Anthropic stream closed without message_stop");
           controller.enqueue(
             encoder.encode(sse("error", {
               message: "The model's response was cut off before completing. " +
@@ -105,7 +119,8 @@ export function transformAnthropicStream(
           );
         }
         controller.close();
-      } catch {
+      } catch (err) {
+        console.error("Anthropic stream threw:", err instanceof Error ? err.message : String(err));
         controller.enqueue(encoder.encode(sse("error", { message: "Stream interrupted" })));
         controller.close();
       }
