@@ -1,0 +1,6 @@
+# Copy to .dev.vars and fill in real values for local dev.
+# .dev.vars is gitignored — never commit real secrets.
+
+ANTHROPIC_API_KEY=sk-ant-replace-me
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA  # Cloudflare's "always passes" test secret for dev
+DAILY_BUDGET_CENTS=500
