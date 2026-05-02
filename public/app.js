@@ -4,21 +4,45 @@ const escapeHtml = (s) => s
   .replace(/</g, "&lt;")
   .replace(/>/g, "&gt;");
 
+// Inject Turnstile api.js, then render the widget once the library is ready.
+// `window.turnstile` becomes an object before all its methods (like .render)
+// are defined, so we wait until .render is actually a function — using
+// turnstile.ready() if exposed, or polling as a fallback.
 async function bootTurnstile() {
+  let pollCount = 0;
+  function actuallyRender(sitekey) {
+    const div = document.getElementById("turnstile");
+    if (!div || div.dataset.rendered) return;
+    if (window.turnstile && typeof window.turnstile.render === "function") {
+      window.turnstile.render(div, { sitekey, theme: "light" });
+      div.dataset.rendered = "1";
+      return;
+    }
+    if (pollCount++ < 50) setTimeout(() => actuallyRender(sitekey), 100);
+  }
+
   try {
     const cfg = await fetch("/api/config").then((r) => r.json());
-    const div = document.getElementById("turnstile");
-    if (div && cfg.turnstile_site_key) {
-      div.setAttribute("data-sitekey", cfg.turnstile_site_key);
-      if (window.turnstile && window.turnstile.render) {
-        window.turnstile.render(div);
-      }
-      // If turnstile script hasn't loaded yet, the implicit render-on-load
-      // will pick the populated data-sitekey up.
+    if (!cfg.turnstile_site_key) return;
+
+    if (window.turnstile && typeof window.turnstile.ready === "function") {
+      window.turnstile.ready(() => actuallyRender(cfg.turnstile_site_key));
+    } else if (window.turnstile && typeof window.turnstile.render === "function") {
+      actuallyRender(cfg.turnstile_site_key);
+    } else if (!document.querySelector('script[src*="turnstile/v0/api.js"]')) {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+      script.async = true;
+      script.defer = true;
+      script.onload = () => actuallyRender(cfg.turnstile_site_key);
+      document.head.appendChild(script);
+    } else {
+      // Script tag already in DOM but library still initializing — poll.
+      actuallyRender(cfg.turnstile_site_key);
     }
   } catch {
-    // /api/config unreachable — Turnstile widget stays unrendered, user
-    // gets the "please complete the human-verification check" error on submit.
+    // /api/config unreachable — widget stays unrendered, user gets
+    // "please complete the human-verification check" on submit.
   }
 }
 bootTurnstile();
@@ -37,7 +61,7 @@ const surveySkip = $("#survey-skip");
 const surveyStatus = $("#survey-status");
 const ranWithoutCheckbox = surveyForm.querySelector('input[name="ran_without"]');
 const ranWithCheckbox = surveyForm.querySelector('input[name="ran_with"]');
-const searchNeededWrapper = $("#search-needed-wrapper");
+const searchAbleWrapper = $("#search-able-wrapper");
 
 let currentSubmissionId = null;
 let currentSearchUsed = false;
@@ -63,13 +87,15 @@ formEl.addEventListener("submit", async (e) => {
     errorEl.textContent = `Passage must be 150–500 words (got ${n}).`;
     return;
   }
-  const turnstileToken = window.turnstile && window.turnstile.getResponse
+  // Use the real Turnstile token when the widget has rendered, otherwise
+  // fall back to a non-empty placeholder. In local dev the server-side
+  // TURNSTILE_SECRET is Cloudflare's "always-pass" test secret, so any
+  // non-empty token verifies. In production with a real secret, the
+  // placeholder will be rejected — which is the correct behavior, since
+  // a real widget should always be present there.
+  const turnstileToken = (window.turnstile && window.turnstile.getResponse
     ? window.turnstile.getResponse()
-    : "";
-  if (!turnstileToken) {
-    errorEl.textContent = "Please complete the human-verification check.";
-    return;
-  }
+    : "") || "no-widget";
 
   submitBtn.disabled = true;
   submitBtn.textContent = "Thinking…";
@@ -162,13 +188,14 @@ for (const btn of document.querySelectorAll("#thumbs button")) {
   });
 }
 
-// Survey: show "search was needed" question only when both checkboxes ticked.
-function refreshSearchNeededVisibility() {
+// Survey: show "was Claude able without search?" question only when both
+// "ran with" and "ran without" boxes are ticked.
+function refreshSearchAbleVisibility() {
   const both = ranWithoutCheckbox.checked && ranWithCheckbox.checked;
-  searchNeededWrapper.hidden = !both;
+  searchAbleWrapper.hidden = !both;
 }
-ranWithoutCheckbox.addEventListener("change", refreshSearchNeededVisibility);
-ranWithCheckbox.addEventListener("change", refreshSearchNeededVisibility);
+ranWithoutCheckbox.addEventListener("change", refreshSearchAbleVisibility);
+ranWithCheckbox.addEventListener("change", refreshSearchAbleVisibility);
 
 surveyForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -182,7 +209,13 @@ surveyForm.addEventListener("submit", async (e) => {
     has_public_writing: fd.get("has_public_writing") ? true : false,
     posts_per_month: fd.get("posts_per_month") ? Number(fd.get("posts_per_month")) : null,
     ran_with_search: bitmask || null,
-    search_was_needed: searchNeededWrapper.hidden ? null : !!fd.get("search_was_needed"),
+    // Question is "was Claude able WITHOUT search?" — flip to the
+    // server's "was search needed?" semantics: yes (able) → 0, no (not able) → 1.
+    search_was_needed: searchAbleWrapper.hidden
+      ? null
+      : (fd.get("search_was_able") === "no" ? true
+        : fd.get("search_was_able") === "yes" ? false
+        : null),
     freeform_comment: fd.get("freeform_comment") || null,
   };
   const res = await fetch("/api/survey", {

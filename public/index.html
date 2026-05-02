@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>(De)Publius — Can Claude identify you from your writing?</title>
   <link rel="stylesheet" href="/style.css">
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <!-- Turnstile api.js is injected by app.js AFTER data-sitekey is set,
+       so the implicit-render scan picks up the populated div on first load. -->
 </head>
 <body>
   <main>
@@ -63,10 +64,11 @@
             <label class="checkbox"><input type="checkbox" name="ran_with"> With search</label>
           </fieldset>
 
-          <label class="checkbox" id="search-needed-wrapper" hidden>
-            <input type="checkbox" name="search_was_needed">
-            If you ran both: was Claude unable to identify you without search?
-          </label>
+          <fieldset id="search-able-wrapper" hidden>
+            <legend>If you ran both: was Claude able to identify you without search?</legend>
+            <label class="checkbox"><input type="radio" name="search_was_able" value="yes"> Yes</label>
+            <label class="checkbox"><input type="radio" name="search_was_able" value="no"> No</label>
+          </fieldset>
 
           <label>
             Anything else you'd like to share?
