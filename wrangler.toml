@@ -28,7 +28,7 @@ DAILY_BUDGET_CENTS = "500"
 TURNSTILE_SITE_KEY = "1x00000000000000000000AA"  # test key for dev; replace via vars.production for deploy
 
 [env.production.vars]
-DAILY_BUDGET_CENTS = "500"
+DAILY_BUDGET_CENTS = "2500"
 TURNSTILE_SITE_KEY = "0x4AAAAAADHupTNuQbIHdDjr"
 
 # Wrangler 3+ does not inherit bindings into env blocks — d1_databases must

@@ -6,7 +6,7 @@ import { verifyTurnstile } from "./turnstile";
 import { checkRateLimit } from "./ratelimit";
 import { isBudgetExhausted, recordCost, estimateCostCents } from "./budget";
 
-const MODEL = "claude-sonnet-4-5";
+const MODEL = "claude-opus-4-6";
 // Anthropic requires max_tokens > thinking.budget_tokens.
 // 4000 thinking + 4000 answer headroom = 8000 max_tokens cap.
 const THINKING_BUDGET_TOKENS = 4000;

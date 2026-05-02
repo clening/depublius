@@ -1,7 +1,7 @@
-// Rough Sonnet 4.5 pricing as of 2026-05: $3 / MTok input, $15 / MTok output.
+// Rough Opus 4.6 pricing as of 2026-05: $15 / MTok input, $75 / MTok output.
 // Web search add-on: ~$10 per 1000 searches = 1 cent per search.
-const INPUT_CENTS_PER_MTOK = 300;   // $3.00
-const OUTPUT_CENTS_PER_MTOK = 1500; // $15.00
+const INPUT_CENTS_PER_MTOK = 1500;  // $15.00
+const OUTPUT_CENTS_PER_MTOK = 7500; // $75.00
 const SEARCH_FLAT_CENTS = 1;
 
 export function estimateCostCents(opts: {
