@@ -4,6 +4,25 @@ const escapeHtml = (s) => s
   .replace(/</g, "&lt;")
   .replace(/>/g, "&gt;");
 
+async function bootTurnstile() {
+  try {
+    const cfg = await fetch("/api/config").then((r) => r.json());
+    const div = document.getElementById("turnstile");
+    if (div && cfg.turnstile_site_key) {
+      div.setAttribute("data-sitekey", cfg.turnstile_site_key);
+      if (window.turnstile && window.turnstile.render) {
+        window.turnstile.render(div);
+      }
+      // If turnstile script hasn't loaded yet, the implicit render-on-load
+      // will pick the populated data-sitekey up.
+    }
+  } catch {
+    // /api/config unreachable — Turnstile widget stays unrendered, user
+    // gets the "please complete the human-verification check" error on submit.
+  }
+}
+bootTurnstile();
+
 const passageEl = $("#passage");
 const wordCountEl = $("#word-count");
 const formEl = $("#analyze-form");

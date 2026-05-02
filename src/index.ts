@@ -8,6 +8,12 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith("/api/")) {
+      if (url.pathname === "/api/config" && request.method === "GET") {
+        return new Response(
+          JSON.stringify({ turnstile_site_key: env.TURNSTILE_SITE_KEY }),
+          { headers: { "content-type": "application/json", "cache-control": "max-age=300" } }
+        );
+      }
       if (url.pathname === "/api/analyze" && request.method === "POST") {
         return handleAnalyze(request, env);
       }
