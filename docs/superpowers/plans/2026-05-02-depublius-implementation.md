@@ -526,17 +526,18 @@ git commit -m "feat: Worker entry with API router stubs + static asset placehold
 
 - [ ] **Step 1: Create `vitest.config.ts`**
 
-```typescript
-import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
+`@cloudflare/vitest-pool-workers` v4+ uses `cloudflareTest` as a Vitest plugin (not `defineWorkersConfig` from `/config` — that subpath was removed in 0.10.x). Use this shape:
 
-export default defineWorkersConfig({
-  test: {
-    poolOptions: {
-      workers: {
-        wrangler: { configPath: "./wrangler.toml" },
-      },
-    },
-  },
+```typescript
+import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  plugins: [
+    cloudflareTest({
+      wrangler: { configPath: "./wrangler.toml" },
+    }),
+  ],
 });
 ```
 
