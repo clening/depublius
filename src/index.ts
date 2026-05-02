@@ -1,4 +1,5 @@
 import type { Env } from "./types";
+import { handleAnalyze } from "./analyze";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -6,7 +7,7 @@ export default {
 
     if (url.pathname.startsWith("/api/")) {
       if (url.pathname === "/api/analyze" && request.method === "POST") {
-        return new Response("not implemented", { status: 501 });
+        return handleAnalyze(request, env);
       }
       if (url.pathname === "/api/feedback" && request.method === "POST") {
         return new Response("not implemented", { status: 501 });
@@ -17,7 +18,6 @@ export default {
       return new Response("not found", { status: 404 });
     }
 
-    // Static assets handle everything else (HTML, CSS, JS, images).
     return env.ASSETS.fetch(request);
   },
 };
