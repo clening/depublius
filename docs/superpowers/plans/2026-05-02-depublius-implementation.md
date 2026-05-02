@@ -186,13 +186,13 @@ for details.
 MIT
 ```
 
-- [ ] **Step 9: Verify TS compiles**
+- [ ] **Step 9: Verify TS config parses**
 
 ```bash
 npx tsc --noEmit
 ```
 
-Expected: no errors (no source files yet, but tsconfig should parse).
+Expected: error TS18003 ("No inputs were found in config file") and exit code 2. This is fine — the config itself parsed correctly; there are simply no `.ts` files for it to compile yet. Self-resolves once Task 5 creates `src/`.
 
 - [ ] **Step 10: Commit**
 

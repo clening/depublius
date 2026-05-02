@@ -1,11 +1,10 @@
 {
   "name": "depublius",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
-  },
+  "description": "Streaming author-identification demo on Cloudflare Workers",
+  "type": "module",
+  "license": "MIT",
+  "author": "Carey Lening <carey.lening@gmail.com>",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -15,10 +14,6 @@
     "db:migrate:remote": "wrangler d1 migrations apply depublius --remote",
     "db:export": "wrangler d1 export depublius --remote --output ./export.sql"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0"
   },
