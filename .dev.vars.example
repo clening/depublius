@@ -1,6 +1,9 @@
 # Copy to .dev.vars and fill in real values for local dev.
 # .dev.vars is gitignored — never commit real secrets.
+#
+# Only true secrets go here. Plain config vars like DAILY_BUDGET_CENTS
+# and TURNSTILE_SITE_KEY live in wrangler.toml [vars] (and the
+# [env.production.vars] override).
 
 ANTHROPIC_API_KEY=sk-ant-replace-me
 TURNSTILE_SECRET=1x0000000000000000000000000000000AA  # Cloudflare's "always passes" test secret for dev
-DAILY_BUDGET_CENTS=500

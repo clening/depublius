@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { transformAnthropicStream } from "../src/anthropic-stream";
 
+// Anthropic's HTTP streaming endpoint emits SSE frames: `event: <name>\n
+// data: {<json>}\n\n`. Tests feed those raw bytes through the transformer.
+
 function makeUpstream(events: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   return new ReadableStream({
@@ -42,7 +45,7 @@ describe("transformAnthropicStream", () => {
     expect(out).toContain(`"delta":"The author is..."`);
   });
 
-  it("emits 'done' event with submission_id when stream closes", async () => {
+  it("emits 'done' event with submission_id when stream sees message_stop", async () => {
     const upstream = makeUpstream([
       `event: message_stop\ndata: {"type":"message_stop"}\n\n`,
     ]);
@@ -59,7 +62,7 @@ describe("transformAnthropicStream", () => {
     expect(out).not.toContain("ping");
   });
 
-  it("handles multiple deltas split across chunks", async () => {
+  it("handles deltas split across chunks", async () => {
     const upstream = makeUpstream([
       `event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hel`,
       `lo"}}\n\n`,

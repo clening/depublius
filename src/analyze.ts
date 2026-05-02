@@ -1,4 +1,3 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { Env, AnalyzeRequestBody } from "./types";
 import { validatePassage } from "./validation";
 import { buildSystemPrompt, buildUserPrompt } from "./prompts";
@@ -8,8 +7,22 @@ import { checkRateLimit } from "./ratelimit";
 import { isBudgetExhausted, recordCost, estimateCostCents } from "./budget";
 
 const MODEL = "claude-sonnet-4-5";
-const THINKING_BUDGET_TOKENS = 8000;
-const MAX_OUTPUT_TOKENS = 4096;
+// Anthropic requires max_tokens > thinking.budget_tokens.
+// 4000 thinking + 4000 answer headroom = 8000 max_tokens cap.
+const THINKING_BUDGET_TOKENS = 4000;
+const MAX_OUTPUT_TOKENS = 8000;
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
+
+interface AnthropicRequestBody {
+  model: string;
+  max_tokens: number;
+  system: string;
+  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  thinking: { type: "enabled"; budget_tokens: number };
+  stream: true;
+  tools?: Array<{ type: string; name: string }>;
+}
 
 export async function handleAnalyze(request: Request, env: Env): Promise<Response> {
   let body: AnalyzeRequestBody;
@@ -35,9 +48,8 @@ export async function handleAnalyze(request: Request, env: Env): Promise<Respons
   }
 
   const submissionId = crypto.randomUUID();
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
 
-  const params: Anthropic.MessageCreateParamsStreaming = {
+  const apiBody: AnthropicRequestBody = {
     model: MODEL,
     max_tokens: MAX_OUTPUT_TOKENS,
     system: buildSystemPrompt(),
@@ -46,11 +58,25 @@ export async function handleAnalyze(request: Request, env: Env): Promise<Respons
     stream: true,
   };
   if (body.use_search) {
-    params.tools = [{ type: "web_search_20250305", name: "web_search" } as Anthropic.Messages.ToolUnion];
+    apiBody.tools = [{ type: "web_search_20250305", name: "web_search" }];
   }
 
-  const upstream = client.messages.stream(params).toReadableStream();
-  const transformed = transformAnthropicStream(upstream, submissionId);
+  const upstreamRes = await fetch(ANTHROPIC_URL, {
+    method: "POST",
+    headers: {
+      "x-api-key": env.ANTHROPIC_API_KEY,
+      "anthropic-version": ANTHROPIC_VERSION,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(apiBody),
+  });
+  if (!upstreamRes.ok || !upstreamRes.body) {
+    const errText = await upstreamRes.text().catch(() => "");
+    console.error("Anthropic upstream error", upstreamRes.status, errText.slice(0, 500));
+    return jsonError(502, "Upstream error from Anthropic");
+  }
+
+  const transformed = transformAnthropicStream(upstreamRes.body, submissionId);
 
   // Best-effort post-stream cost recording. We don't have exact token counts
   // here without consuming the stream twice; estimate based on input length
@@ -62,7 +88,6 @@ export async function handleAnalyze(request: Request, env: Env): Promise<Respons
     outputTokens,
     searchUsed: body.use_search === true,
   });
-  // Fire and forget; don't block the stream on the budget write.
   recordCost(env.DB, cents).catch(() => {});
 
   return new Response(transformed, {

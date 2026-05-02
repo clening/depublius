@@ -1,3 +1,11 @@
+// Anthropic's HTTP streaming endpoint emits SSE frames:
+//   event: <name>\n
+//   data: {<json>}\n
+//   \n
+// We reframe those into browser-friendly SSE:
+//   event: thinking|text|done|error
+//   data: {<small json>}
+
 type AnthropicEvent =
   | { type: "content_block_delta"; delta: { type: "thinking_delta"; thinking: string } | { type: "text_delta"; text: string } }
   | { type: "message_stop" }
@@ -26,7 +34,7 @@ export function transformAnthropicStream(
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
 
-          // SSE messages are separated by blank lines.
+          // SSE frames are separated by blank lines.
           let sepIdx: number;
           while ((sepIdx = buffer.indexOf("\n\n")) !== -1) {
             const raw = buffer.slice(0, sepIdx);
@@ -59,7 +67,7 @@ export function transformAnthropicStream(
           controller.enqueue(encoder.encode(sse("done", { submission_id: submissionId })));
         }
         controller.close();
-      } catch (err) {
+      } catch {
         controller.enqueue(encoder.encode(sse("error", { message: "Stream interrupted" })));
         controller.close();
       }
